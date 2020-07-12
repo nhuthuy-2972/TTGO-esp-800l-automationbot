@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include "Adafruit_FONA.h"
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -9,7 +8,7 @@
 #define SIM800L_PWRKEY 4
 #define SIM800L_RST 5
 #define SIM800L_POWER 23
-
+#define provider "+84522117204"
 HardwareSerial *sim800lSerial = &Serial1;
 Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
@@ -91,6 +90,43 @@ char sim800lNotificationBuffer[64]; //for notifications from the FONA
 char smsBuffer[250];
 boolean ledState = false;
 
+void http_post(String sms)
+{
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println(F("http start"));
+    HTTPClient http;
+    // Your Domain name with URL path or IP address with path
+    http.begin(serverName);
+
+    // Specify content-type header
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    // Data to send with HTTP POST
+    String httpRequestData = "sms=" + sms;
+
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(httpRequestData);
+
+    /*
+        // If you need an HTTP request with a content type: application/json, use the following:
+        http.addHeader("Content-Type", "application/json");
+        // JSON data to send with HTTP POST
+        String httpRequestData = "{\"api_key\":\"" + apiKey + "\",\"field1\":\"" + String(random(40)) + "\"}";           
+        // Send HTTP POST request
+        int httpResponseCode = http.POST(httpRequestData);*/
+
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    // Free resources
+    http.end();
+  }
+  else
+  {
+    Serial.println("WiFi Disconnected");
+  }
+}
+
 void loop()
 {
   if (millis() - prevMillis > interval)
@@ -139,44 +175,14 @@ void loop()
       // Retrieve SMS value.
       uint16_t smslen;
       // Pass in buffer and max len!
+
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
         smsString = String(smsBuffer);
-        // Serial.println(smsString);
-
-        delay(5000);
-        if (WiFi.status() == WL_CONNECTED)
+        String sender = String(callerIDbuffer);
+        if (sender.equals(provider))
         {
-          Serial.println(F("http start"));
-          HTTPClient http;
-          // Your Domain name with URL path or IP address with path
-          http.begin(serverName);
-
-          // Specify content-type header
-          http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-          // Data to send with HTTP POST
-          String httpRequestData = "sms=" + smsString;
-
-          // Send HTTP POST request
-          int httpResponseCode = http.POST(httpRequestData);
-
-          /*
-        // If you need an HTTP request with a content type: application/json, use the following:
-        http.addHeader("Content-Type", "application/json");
-        // JSON data to send with HTTP POST
-        String httpRequestData = "{\"api_key\":\"" + apiKey + "\",\"field1\":\"" + String(random(40)) + "\"}";           
-        // Send HTTP POST request
-        int httpResponseCode = http.POST(httpRequestData);*/
-
-          Serial.print("HTTP Response code: ");
-          Serial.println(httpResponseCode);
-
-          // Free resources
-          http.end();
-        }
-        else
-        {
-          Serial.println("WiFi Disconnected");
+          http_post(smsString);
         }
       }
     }
