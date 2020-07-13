@@ -8,15 +8,15 @@
 #define SIM800L_PWRKEY 4
 #define SIM800L_RST 5
 #define SIM800L_POWER 23
-#define provider "+84522117204"
+#define provider "+84522117194"
 #define APPLICATION_ID "applicationid"
-#define REST_API_KEY "key"
+#define REST_API_KEY "masterkey"
 HardwareSerial *sim800lSerial = &Serial1;
 Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
-const char *ssid = "001-INNO-DEV";
-const char *password = "Innoria@@081120";
-const char *serverName = "http://c919b3656b5a.ngrok.io/device/sim800l";
+const char *ssid = "Huyip";
+const char *password = "plnhuthuy";
+const char *serverName = "http://172.20.10.9:1337/parse/classes/Message";
 char httpdata[250];
 //String apiKey = "REPLACE_WITH_YOUR_API_KEY";
 
@@ -103,15 +103,18 @@ void http_post(char *sms, char *sender)
     http.begin(serverName);
 
     // Specify content-type header
-    //http.addHeader("X-Parse-Application-Id:", APPLICATION_ID);
-    //http.addHeader("X-Parse-REST-API-Key:", REST_API_KEY);
-    //http.addHeader("Content-Type", "application/json");
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Parse-Application-Id", APPLICATION_ID);
+    http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
+
+    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     // Send HTTP POST request
 
-    snprintf(httpdata, sizeof(httpdata), "{\"sms\": \"%s\" ,\"sender\":\"%s\"}", sms, sender);
-    String data = String(httpdata);
-    int httpResponseCode = http.POST("sms=" + data);
+    snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\" ,\"phoneNumber\":\"%s\"}", sms, sender);
+    Serial.println(httpdata);
+    //String data = String(httpdata);
+    //Serial.println(httpdata);
+    int httpResponseCode = http.POST(httpdata);
 
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
