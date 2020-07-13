@@ -9,12 +9,15 @@
 #define SIM800L_RST 5
 #define SIM800L_POWER 23
 #define provider "+84522117204"
+#define APPLICATION_ID "applicationid"
+#define REST_API_KEY "key"
 HardwareSerial *sim800lSerial = &Serial1;
 Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
-const char *ssid = "Huyip";
-const char *password = "plnhuthuy";
-const char *serverName = "http://0e7736c160fd.ngrok.io/device/sim800l";
+const char *ssid = "001-INNO-DEV";
+const char *password = "Innoria@@081120";
+const char *serverName = "http://c919b3656b5a.ngrok.io/device/sim800l";
+char httpdata[250];
 //String apiKey = "REPLACE_WITH_YOUR_API_KEY";
 
 char replybuffer[255];
@@ -90,7 +93,7 @@ char sim800lNotificationBuffer[64]; //for notifications from the FONA
 char smsBuffer[250];
 boolean ledState = false;
 
-void http_post(String sms)
+void http_post(char *sms, char *sender)
 {
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -100,20 +103,15 @@ void http_post(String sms)
     http.begin(serverName);
 
     // Specify content-type header
+    //http.addHeader("X-Parse-Application-Id:", APPLICATION_ID);
+    //http.addHeader("X-Parse-REST-API-Key:", REST_API_KEY);
+    //http.addHeader("Content-Type", "application/json");
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    // Data to send with HTTP POST
-    String httpRequestData = "sms=" + sms;
-
     // Send HTTP POST request
-    int httpResponseCode = http.POST(httpRequestData);
 
-    /*
-        // If you need an HTTP request with a content type: application/json, use the following:
-        http.addHeader("Content-Type", "application/json");
-        // JSON data to send with HTTP POST
-        String httpRequestData = "{\"api_key\":\"" + apiKey + "\",\"field1\":\"" + String(random(40)) + "\"}";           
-        // Send HTTP POST request
-        int httpResponseCode = http.POST(httpRequestData);*/
+    snprintf(httpdata, sizeof(httpdata), "{\"sms\": \"%s\" ,\"sender\":\"%s\"}", sms, sender);
+    String data = String(httpdata);
+    int httpResponseCode = http.POST("sms=" + data);
 
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
@@ -178,11 +176,11 @@ void loop()
 
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
-        smsString = String(smsBuffer);
         String sender = String(callerIDbuffer);
+
         if (sender.equals(provider))
         {
-          http_post(smsString);
+          http_post(smsBuffer, callerIDbuffer);
         }
       }
     }
