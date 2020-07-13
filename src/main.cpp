@@ -16,7 +16,7 @@ Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
 const char *ssid = "Huyip";
 const char *password = "plnhuthuy";
-const char *serverName = "http://172.20.10.9:1337/parse/classes/Message";
+const char *serverName = "http://172.20.10.4:1337/parse/classes/Message";
 char httpdata[250];
 //String apiKey = "REPLACE_WITH_YOUR_API_KEY";
 
@@ -179,12 +179,13 @@ void loop()
 
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
-        String sender = String(callerIDbuffer);
+        http_post(smsBuffer, callerIDbuffer);
+        //String sender = String(callerIDbuffer);
 
-        if (sender.equals(provider))
-        {
-          http_post(smsBuffer, callerIDbuffer);
-        }
+        // if (sender.equals(provider))
+        // {
+        //   http_post(smsBuffer, callerIDbuffer);
+        // }
       }
     }
   }
