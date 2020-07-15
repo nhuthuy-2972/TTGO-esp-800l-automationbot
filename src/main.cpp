@@ -2,15 +2,15 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
+#include <Arduino_JSON.h>
 
 #define SIM800L_RX 27
 #define SIM800L_TX 26
 #define SIM800L_PWRKEY 4
 #define SIM800L_RST 5
 #define SIM800L_POWER 23
-#define provider "+84522117194"
-#define APPLICATION_ID "applicationid"
-#define REST_API_KEY "masterkey"
+#define APPLICATION_ID "d91b47af8bd27e39704139d448340365"
+#define REST_API_KEY "12038d977e3c0f2b53a5939973f48acd"
 HardwareSerial *sim800lSerial = &Serial1;
 Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
@@ -18,11 +18,11 @@ const char *ssid = "001-INNO-DEV";
 const char *password = "Innoria@@081120";
 //const char *ssid = "yanbi";
 //const char *password = "thucuoi2012";
-const char *messageClass = "http://192.168.1.170:1337/parse/classes/Message";
-char httpdata[250];
+const char *messageClass = "http://192.168.1.188:1337/parse/classes/Message";
+String simidurl = "http://192.168.1.188:1337/parse/classes/SimRobot?where={\"ccid\":\"";
+char httpdata[350];
 char ccid[21] = {0};
-//String apiKey = "REPLACE_WITH_YOUR_API_KEY";
-
+String objectid;
 char replybuffer[255];
 uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
@@ -30,7 +30,7 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 #define RELAY 14
 
 String smsString = "";
-
+String simobject = "";
 long prevMillis = 0;
 int interval = 1000;
 char sim800lNotificationBuffer[64]; //for notifications from the FONA
@@ -51,7 +51,41 @@ void wifi_config()
   Serial.println(WiFi.localIP());
 }
 
-void http_post(const char *url)
+String getsimid(String url)
+{
+  String payload = "{}";
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println(F("http start"));
+    HTTPClient http;
+    http.begin(url.c_str());
+    // Your Domain name with URL path or IP address with path
+    // Specify content-type header
+    http.addHeader("X-Parse-Application-Id", APPLICATION_ID);
+    http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
+
+    int httpResponseCode = http.GET();
+    if (httpResponseCode > 0)
+    {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      payload = http.getString();
+    }
+    else
+    {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    // Free resources
+    http.end();
+  }
+  else
+  {
+    Serial.println("WiFi Disconnected");
+  }
+  return payload;
+}
+void post_message(const char *url, char *httpdata)
 {
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -59,23 +93,15 @@ void http_post(const char *url)
     HTTPClient http;
     // Your Domain name with URL path or IP address with path
     http.begin(url);
-
     // Specify content-type header
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Parse-Application-Id", APPLICATION_ID);
-    // http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
-
-    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
     // Send HTTP POST request
-
     Serial.println(httpdata);
-    //String data = String(httpdata);
-    //Serial.println(httpdata);
     int httpResponseCode = http.POST(httpdata);
-
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
-
     // Free resources
     http.end();
   }
@@ -125,19 +151,31 @@ void setup()
     Serial.println(ccid);
   }
 
-  //  char imei[16] = {0}; // MUST use a 16 character buffer for IMEI!
-  //  uint8_t imeiLen = sim800l.getIMEI(imei);
-  //  if (imeiLen > 0) {
-  //    Serial.print("SIM card IMEI: "); Serial.println(imei);
-  //  }
-
-  // Set up the FONA to send a +CMTI notification
-  // when an SMS is received
   sim800lSerial->print("AT+CNMI=2,1\r\n");
 
   Serial.println("GSM SIM800L Ready");
-  snprintf(httpdata, sizeof(httpdata), "{\"message\": \"Initial Robot\",\"phoneNumber\": \"Robot\", \"ccid\": \"%s\"}", ccid);
-  http_post(messageClass);
+  simidurl = simidurl + ccid + "\"}";
+  simobject = getsimid(simidurl);
+
+  while (simobject.equals("{}"))
+  {
+    simobject = getsimid(simidurl);
+  }
+
+  JSONVar myObject = JSON.parse(simobject);
+  if (JSON.typeof(myObject) == "undefined")
+  {
+    Serial.println("Parsing input failed!");
+    return;
+  }
+
+  Serial.print("JSON object = ");
+  Serial.println(myObject);
+
+  JSONVar keys = myObject.keys();
+
+  objectid = myObject["results"][0]["objectId"];
+  Serial.println(objectid);
 }
 
 void loop()
@@ -191,8 +229,8 @@ void loop()
 
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
-        snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\",\"phoneNumber\": \"%s\", \"ccid\": \"%s\"}", smsBuffer, callerIDbuffer, ccid);
-        http_post(messageClass);
+        snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\",\"phoneNumber\": \"%s\",\"sim\": {\"__type\":\"Pointer\",\"className\":\"SimRobot\",\"objectId\":\"%s\"}}", smsBuffer, callerIDbuffer, objectid.c_str());
+        post_message(messageClass, httpdata);
       }
     }
   }
