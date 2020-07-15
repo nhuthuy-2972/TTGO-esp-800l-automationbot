@@ -14,10 +14,13 @@
 HardwareSerial *sim800lSerial = &Serial1;
 Adafruit_FONA sim800l = Adafruit_FONA(SIM800L_PWRKEY);
 
-const char *ssid = "Huyip";
-const char *password = "plnhuthuy";
-const char *serverName = "http://172.20.10.4:1337/parse/classes/Message";
+const char *ssid = "001-INNO-DEV";
+const char *password = "Innoria@@081120";
+//const char *ssid = "yanbi";
+//const char *password = "thucuoi2012";
+const char *messageClass = "http://192.168.1.170:1337/parse/classes/Message";
 char httpdata[250];
+char ccid[21] = {0};
 //String apiKey = "REPLACE_WITH_YOUR_API_KEY";
 
 char replybuffer[255];
@@ -27,6 +30,12 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 #define RELAY 14
 
 String smsString = "";
+
+long prevMillis = 0;
+int interval = 1000;
+char sim800lNotificationBuffer[64]; //for notifications from the FONA
+char smsBuffer[250];
+boolean ledState = false;
 
 void wifi_config()
 {
@@ -40,6 +49,40 @@ void wifi_config()
   Serial.println("");
   Serial.print("Connected to WiFi network with IP Address: ");
   Serial.println(WiFi.localIP());
+}
+
+void http_post(const char *url)
+{
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println(F("http start"));
+    HTTPClient http;
+    // Your Domain name with URL path or IP address with path
+    http.begin(url);
+
+    // Specify content-type header
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Parse-Application-Id", APPLICATION_ID);
+    // http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
+
+    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    // Send HTTP POST request
+
+    Serial.println(httpdata);
+    //String data = String(httpdata);
+    //Serial.println(httpdata);
+    int httpResponseCode = http.POST(httpdata);
+
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    // Free resources
+    http.end();
+  }
+  else
+  {
+    Serial.println("WiFi Disconnected");
+  }
 }
 
 void setup()
@@ -74,6 +117,14 @@ void setup()
 
   Serial.println(F("GSM SIM800L is OK"));
 
+  uint8_t ccid_len = sim800l.getSIMCCID(ccid);
+
+  if (ccid_len > 0)
+  {
+    Serial.print("SIM CCID: ");
+    Serial.println(ccid);
+  }
+
   //  char imei[16] = {0}; // MUST use a 16 character buffer for IMEI!
   //  uint8_t imeiLen = sim800l.getIMEI(imei);
   //  if (imeiLen > 0) {
@@ -85,47 +136,8 @@ void setup()
   sim800lSerial->print("AT+CNMI=2,1\r\n");
 
   Serial.println("GSM SIM800L Ready");
-}
-
-long prevMillis = 0;
-int interval = 1000;
-char sim800lNotificationBuffer[64]; //for notifications from the FONA
-char smsBuffer[250];
-boolean ledState = false;
-
-void http_post(char *sms, char *sender)
-{
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println(F("http start"));
-    HTTPClient http;
-    // Your Domain name with URL path or IP address with path
-    http.begin(serverName);
-
-    // Specify content-type header
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Parse-Application-Id", APPLICATION_ID);
-    http.addHeader("X-Parse-REST-API-Key", REST_API_KEY);
-
-    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    // Send HTTP POST request
-
-    snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\" ,\"phoneNumber\":\"%s\"}", sms, sender);
-    Serial.println(httpdata);
-    //String data = String(httpdata);
-    //Serial.println(httpdata);
-    int httpResponseCode = http.POST(httpdata);
-
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-
-    // Free resources
-    http.end();
-  }
-  else
-  {
-    Serial.println("WiFi Disconnected");
-  }
+  snprintf(httpdata, sizeof(httpdata), "{\"message\": \"Initial Robot\",\"phoneNumber\": \"Robot\", \"ccid\": \"%s\"}", ccid);
+  http_post(messageClass);
 }
 
 void loop()
@@ -179,13 +191,8 @@ void loop()
 
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
-        http_post(smsBuffer, callerIDbuffer);
-        //String sender = String(callerIDbuffer);
-
-        // if (sender.equals(provider))
-        // {
-        //   http_post(smsBuffer, callerIDbuffer);
-        // }
+        snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\",\"phoneNumber\": \"%s\", \"ccid\": \"%s\"}", smsBuffer, callerIDbuffer, ccid);
+        http_post(messageClass);
       }
     }
   }
