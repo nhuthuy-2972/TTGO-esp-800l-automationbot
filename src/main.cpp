@@ -18,8 +18,8 @@ const char *ssid = "001-INNO-DEV";
 const char *password = "Innoria@@081120";
 //const char *ssid = "yanbi";
 //const char *password = "thucuoi2012";
-const char *messageClass = "http://192.168.1.188:1337/parse/classes/Message";
-String simidurl = "http://192.168.1.188:1337/parse/classes/SimRobot?where={\"ccid\":\"";
+const char *messageClass = "http://192.168.1.189:1337/parse/classes/Message";
+String simidurl = "http://192.168.1.189:1337/parse/classes/SimRobot?where={\"ccid\":\"";
 char httpdata[350];
 char ccid[21] = {0};
 String objectid;
@@ -169,11 +169,6 @@ void setup()
     return;
   }
 
-  Serial.print("JSON object = ");
-  Serial.println(myObject);
-
-  JSONVar keys = myObject.keys();
-
   objectid = myObject["results"][0]["objectId"];
   Serial.println(objectid);
 }
@@ -229,7 +224,12 @@ void loop()
 
       if (sim800l.readSMS(slot, smsBuffer, 250, &smslen))
       {
-        snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\",\"phoneNumber\": \"%s\",\"sim\": {\"__type\":\"Pointer\",\"className\":\"SimRobot\",\"objectId\":\"%s\"}}", smsBuffer, callerIDbuffer, objectid.c_str());
+        String smsparse = String(smsBuffer);
+        smsparse.trim();
+        smsparse.replace("\n", "\\n");
+        Serial.println(smsparse);
+        snprintf(httpdata, sizeof(httpdata), "{\"message\": \"%s\",\"phoneNumber\": \"%s\",\"sim\": {\"__type\":\"Pointer\",\"className\":\"SimRobot\",\"objectId\":\"%s\"}}", smsparse.c_str(), callerIDbuffer, objectid.c_str());
+
         post_message(messageClass, httpdata);
       }
     }
